@@ -1,10 +1,11 @@
 from flask import Flask
 import requests
 from bs4 import BeautifulSoup
-import logging
+#import logging
 
 app = Flask(__name__)
 
+"""
 # Set the log level
 app.logger.setLevel(logging.INFO)
 
@@ -15,6 +16,7 @@ file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(mes
 
 # Add the file handler to the app's logger
 app.logger.addHandler(file_handler)
+"""
 
 @app.route("/")
 def hello_world():
@@ -28,8 +30,11 @@ def hello_world2():
 def my_scrapper():
     response = requests.get("https://access.redhat.com/security/cve/CVE-2023-45803")
     soup = BeautifulSoup(response.text, 'html.parser')
-    app.logger.error(soup)
+    #app.logger.error(soup)
     #with open('request_info.md', 'w') as f:
+        #f.write(str(soup.encode("utf-8")))
+    with open('request_info.md', 'w', encoding="utf-8") as f:
+        f.write(str(soup))
     #    f.write(str(response.text))
     return response.text
 
