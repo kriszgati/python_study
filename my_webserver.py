@@ -1,9 +1,23 @@
 from flask import Flask
+import configparser
 import requests
 import json
 import csv
+import logging
+
 
 app = Flask(__name__)
+
+# Set the log level
+app.logger.setLevel(logging.INFO)
+
+# Define a file handler and set its format
+file_handler = logging.FileHandler('flask.log')
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+# Add the file handler to the app's logger
+app.logger.addHandler(file_handler)
 
 
 @app.route("/")
@@ -20,53 +34,82 @@ def my_scrapper():
     # TODO 1. read the cve number from csv file
     # TODO 2. read the cve number from xlsx file
 
-    # Specify the CSV file path
-    csv_file_path = "output.csv"
+    config = load_config()
+    csv_file_path = config.get('CVE', 'CVE_FILE_NAME')
+    
+    # with open(csv_file_path, newline='') as csvfile:
+    #     csv_content = csv.reader(csvfile)
+    #     next(csv_content)   # Skip the first line in the following for loop
+    #     for row in csv_content:
+    #         print(row)
+    #         cve_id = row[0]
+    #         print(cve_id)
+    #         response = requests.get(f"https://access.redhat.com/hydra/rest/securitydata/cve/{cve_id}.json")
+    #         response_json = json.loads(response.text)
+    #         cve_severity = response_json.get("threat_severity")
+    #         print(f"severity = {cve_severity}")
+    #         cvss3 = response_json.get("cvss3")
+    #         cvss3_vector = cvss3.get("cvss3_scoring_vector")
+    #         print(f"cvss v3 vector = {cvss3_vector}")
 
-    with open(csv_file_path, newline='') as csvfile:
-        csv_content = csv.reader(csvfile)
-        next(csv_content)   # Skip the first line in the following for loop
-        for row in csv_content:
-            print(row)
-            cve_id = row[0]
-            print(cve_id)
+    # TODO Replace all constants with the config variable
+    # TODO search for the xlsx file
+
+    cve_list = config.get('CVE', 'CVE_LIST')
+    app.logger.info('CVE list to be parsed: ' + cve_list)
+    cve_list = cve_list.split(',')
+    app.logger.info('CVE list represented as list of strings: ' + str(cve_list))
+    with open(csv_file_path, "a", newline="") as csvfile:
+        fieldnames = config.get('CVE', 'HEADER_FIELD_NAMES')
+        fieldnames = fieldnames.split(',')
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for cve_id in cve_list:
+            app.logger.info('CVE to be processed: ' + cve_id)
             response = requests.get(f"https://access.redhat.com/hydra/rest/securitydata/cve/{cve_id}.json")
             response_json = json.loads(response.text)
             cve_severity = response_json.get("threat_severity")
-            print(f"severity = {cve_severity}")
+            app.logger.info('Severity: ' + cve_severity)
+#            print(f"severity = {cve_severity}")
             cvss3 = response_json.get("cvss3")
             cvss3_vector = cvss3.get("cvss3_scoring_vector")
-            print(f"cvss v3 vector = {cvss3_vector}")
+#            print(f"cvss v3 vector = {cvss3_vector}")
+            app.logger.info('CVSS v3 Vector: ' + cvss3_vector)
+            writer.writerow({"CVE ID": cve_id, "CVE Severity": cve_severity, "CVSS v3 Vector": cvss3_vector})
 
 
-
-
-    cve_id = "CVE-2023-45802"
-    response = requests.get(f"https://access.redhat.com/hydra/rest/securitydata/cve/{cve_id}.json")
-    response_json = json.loads(response.text)
-#    print(f"RESPONSE: {response_json}")
-    cve_severity = response_json.get("threat_severity")
-#    cve_severity = response_json[0].get("resource_url")
-    cvss3 = response_json.get("cvss3")
-    cvss3_vector = cvss3.get("cvss3_scoring_vector")
-    print(f"severity = {cve_severity}")
-    print(f"cvss v3 vector = {cvss3_vector}")
+#     cve_id = "CVE-2023-45802"
+#     response = requests.get(f"https://access.redhat.com/hydra/rest/securitydata/cve/{cve_id}.json")
+#     response_json = json.loads(response.text)
+# #    print(f"RESPONSE: {response_json}")
+#     cve_severity = response_json.get("threat_severity")
+# #    cve_severity = response_json[0].get("resource_url")
+#     cvss3 = response_json.get("cvss3")
+#     cvss3_vector = cvss3.get("cvss3_scoring_vector")
+#     print(f"severity = {cve_severity}")
+#     print(f"cvss v3 vector = {cvss3_vector}")
     # Specify the CSV file path
 #    csv_file_path = "output.csv"
 
     # Write the value of field "CVE Severity" to the CSV file
-    with open(csv_file_path, "w", newline="") as csvfile:
-        fieldnames = ["CVE ID", "CVE Severity", "CVSS v3 Vector"]
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+    # with open(csv_file_path, "w", newline="") as csvfile:
+    #     fieldnames = ["CVE ID", "CVE Severity", "CVSS v3 Vector"]
+    #     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
-        writer.writeheader()
-        writer.writerow({"CVE ID": cve_id, "CVE Severity": cve_severity, "CVSS v3 Vector": cvss3_vector})
+    #     writer.writeheader()
+    #     writer.writerow({"CVE ID": cve_id, "CVE Severity": cve_severity, "CVSS v3 Vector": cvss3_vector})
 
 
 #    with open('request_info.md', 'w', encoding="utf-8") as f:
 #        f.write(str(response.text))
     return response.text
 
+
+
+def load_config():
+    config = configparser.ConfigParser()
+    config.read('config.ini')
+    return config
 
 
 
