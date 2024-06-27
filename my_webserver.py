@@ -2,7 +2,7 @@ from flask import Flask
 import configparser
 import requests
 import json
-import csv
+import math
 import logging
 import datetime
 import os
@@ -14,7 +14,7 @@ app = Flask(__name__)
 # Set the log level
 app.logger.setLevel(logging.INFO)
 
-# Define a file handler and set its format
+# Define a file handler for the log file and set its format
 file_handler = logging.FileHandler('flask.log')
 file_handler.setLevel(logging.INFO)
 file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
@@ -26,19 +26,8 @@ product = "NCS"
 # TODO Read product information from the excel file
 
 
-@app.route("/")
-def hello_world():
-    return "<p>Hello, World!</p>"
-
-@app.route("/hello")
-def hello_world2():
-    return "<p>Hello, World-2!</p>"
-
-
 @app.route("/scrap")
 def my_scrapper():
-    # TODO Replace all constants with the config variable
-    
     app.logger.info(f'*******************************')
     app.logger.info(f'**  The scrapper is running  **')
     app.logger.info(f'*******************************')
@@ -46,94 +35,100 @@ def my_scrapper():
     config = load_config()
     input_file_name_pattern = config.get('CVE_INPUT', 'FILE_PREFIX')
     directory = config.get('CVE_INPUT', 'SEARCH_PATH')
-    cve_list = []
+    cve_ids = []
 
     matches = find_files(directory, input_file_name_pattern)
     app.logger.info(f'The following files are found: {matches}')
     last_file = matches[-1]
     app.logger.info(f'The last file in the list is: {last_file}')
-    first_file = matches[0]
-    app.logger.info(f'The first file in the list is: {first_file}')
+#    first_file = matches[0]
+#    app.logger.info(f'The first file in the list is: {first_file}')
 
+    # Read the excel file into a DataFrame, starting from row 4
     df = pd.read_excel(last_file, header = 3)
     app.logger.info(f'{df}')
 
+    # Extract product information from the excel file
+    # Check if 'Product' column exists in the DataFrame
+    if 'Product' in df.columns:
+        # Extract the data from the 'Product' column into a list
+        products = df['Product'].tolist()
+        app.logger.info(f'The Products extracted from the Excel file are: {products}')
+    else:
+        app.logger.error(f'The "Product" column does not exist in the Excel file {last_file}.')
+    
+    # Extract release information from the excel file
+    # Check if 'Release' column exists in the DataFrame
+    if 'Release' in df.columns:
+        # Extract the data from the 'Release' column into a list
+        releases = df['Release'].tolist()
+        app.logger.info(f'The Releases extracted from the Excel file are: {releases}')
+    else:
+        app.logger.error(f'The "Release" column does not exist in the Excel file {last_file}.')
+    
     # Extract CVE IDs from the excel file
     # Check if 'CVE ID' column exists in the DataFrame
     if 'CVE ID' in df.columns:
         # Extract the data from the 'CVE ID' column into a list
-        cve_list = df['CVE ID'].dropna().tolist()
-        print(cve_list)
-        app.logger.info(f'The CVE IDs extracted from the Excel file are: {cve_list}')
+        cve_ids = df['CVE ID'].tolist()
+        app.logger.info(f'The CVE IDs extracted from the Excel file are: {cve_ids}')
     else:
-        print("The 'CVE ID' column does not exist in the Excel file.")
         app.logger.error(f'The "CVE ID" column does not exist in the Excel file {last_file}.')
     
-    # Extract Disposition Rationale field from the excel file
+    # Extract Disposition Rationale column from the excel file
     # Check if 'Disposition Rationale' column exists in the DataFrame
     if 'Disposition Rationale' in df.columns:
         # Extract the data from the 'Disposition Rationale' column into a string
-        disposition_rationale = df['Disposition Rationale'].dropna().tolist()
-        print(disposition_rationale)
-        app.logger.info(f'The Disposition Rationale extracted from the Excel file is: {disposition_rationale}')
+        disposition_rationales = df['Disposition Rationale'].tolist()
+        app.logger.info(f'The Disposition Rationale fields extracted from the Excel file are: {disposition_rationales}')
     else:
-        print("The 'Disposition Rationale' column does not exist in the Excel file.")
         app.logger.error(f'The "Disposition Rationale" column does not exist in the Excel file {last_file}.')
     
-
-
-
-
-    with open(first_file, newline='') as csvfile:
-        csv_content = csv.reader(csvfile)
-        next(csv_content)   # Skip the first line (the header line) in the following 'for' loop
-        cve_list = []
-        for row in csv_content:
-            app.logger.info(f'Row: {row}')
-            cve_list.append(row[0])
-            app.logger.info(f'CVE list: {cve_list}')
-
-    # Create a csv output filename with a timestamp prefix
-    output_csv_filename = create_output_filename(first_file)
+    # Extract Internal Comments (optional) column from the excel file
+    # Check if 'Internal Comments (optional)' column exists in the DataFrame
+    if 'Internal Comments (optional)' in df.columns:
+        # Extract the data from the 'Internal Comments (optional)' column into a string
+        internal_comments_list = df['Internal Comments (optional)'].tolist()
+        app.logger.info(f'The Internal Comments (optional) fields extracted from the Excel file are: {internal_comments_list}')
+    else:
+        app.logger.error(f'The "Internal Comments (optional)" column does not exist in the Excel file {last_file}.')
+    
+    # Extract Mitigation Tool:Tracking ID column from the excel file
+    # Check if 'Mitigation Tool:Tracking ID' column exists in the DataFrame
+    if 'Mitigation Tool:Tracking ID' in df.columns:
+        # Extract the data from the 'Mitigation Tool:Tracking ID' column into a string
+        tracking_ids_list = df['Mitigation Tool:Tracking ID'].tolist()
+        app.logger.info(f'The Mitigation Tool:Tracking ID fields extracted from the Excel file are: {tracking_ids_list}')
+    else:
+        app.logger.error(f'The "Mitigation Tool:Tracking ID" column does not exist in the Excel file {last_file}.')
 
     # Create an xlsx output filename with a timestamp prefix
-    output_xls_filename = create_output_filename(last_file)
+#    output_xls_filename = create_output_filename(last_file)
 
-    # Create the header row
-    header = config.get('CVE_INPUT', 'HEADER_FIELD_NAMES')
-    header = header.split(',')
-    app.logger.info(f'Header is: {header}')
-
-    rows = []
-
-    with open(output_csv_filename, "a", newline="") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=header)
-        writer.writeheader()
-        for cve_id in cve_list:
-            app.logger.info('CVE to be processed: ' + cve_id)
-            response = requests.get(f"https://access.redhat.com/hydra/rest/securitydata/cve/{cve_id}.json")
-            response_json = json.loads(response.text)
-            cve_severity = response_json.get("threat_severity")
-            app.logger.info('Severity: ' + cve_severity)
-            cvss3 = response_json.get("cvss3")
-            cvss3_vector = cvss3.get("cvss3_scoring_vector")
-            app.logger.info('CVSS v3 Vector: ' + cvss3_vector)
-            disposition_rationale = ""
-            disposition_rationale = disposition_rationale + add_rationale_from_cvss3(cvss3_vector)
-            writer.writerow({"CVE ID": cve_id, "CVE Severity": cve_severity, "CVSS v3 Vector": cvss3_vector, "Disposition Rationale": disposition_rationale})
-            next_row = [cve_id, cve_severity, cvss3_vector, disposition_rationale]
-            rows.append(next_row)
-            app.logger.info(f'Rows are: {rows}')
+    for cve_id in cve_ids:
+        if (isinstance(cve_id, float) and math.isnan(cve_id)) or cve_id == None:
+            continue
+        app.logger.info(f'CVE to be processed: {cve_id}')
+        response = requests.get(f"https://access.redhat.com/hydra/rest/securitydata/cve/{cve_id}.json")
+        response_json = json.loads(response.text)
+        cve_severity = response_json.get("threat_severity")
+        app.logger.info('Severity: ' + cve_severity)
+        cvss3 = response_json.get("cvss3")
+        cvss3_vector = cvss3.get("cvss3_scoring_vector")
+        app.logger.info(f'CVSS v3 Vector: {cvss3_vector}')
+        disposition_rationale = ""
+        disposition_rationale = disposition_rationale + add_rationale_from_cvss3(cvss3_vector)
+#        writer.writerow({"CVE ID": cve_id, "CVE Severity": cve_severity, "CVSS v3 Vector": cvss3_vector, "Disposition Rationale": disposition_rationale})
+#        next_row = [cve_id, cve_severity, cvss3_vector, disposition_rationale]
+#        rows.append(next_row)
+#        app.logger.info(f'Rows are: {rows}')
 
     # Create a new DataFrame with the header and rows
-    df_new = pd.DataFrame(rows, columns=header)
+#    df_new = pd.DataFrame(rows, columns=header)
 
     # Save the updated DataFrame back to the Excel file
-    df_new.to_excel(output_xls_filename, index=False, startrow=0, startcol=0)
+#    df_new.to_excel(output_xls_filename, index=False, startrow=0, startcol=0)
 
-
-#    with open('request_info.md', 'w', encoding="utf-8") as f:
-#        f.write(str(response.text))
     return response.text
 
 
@@ -205,14 +200,14 @@ def create_output_filename(input_filename):
 
 # # defaultdict
 #     id_to_cvelist = defaultdict(list)
-#     for idx, entry in enumerate(cve_list):
+#     for idx, entry in enumerate(cve_ids):
 #         id_to_cvelist[ids[idx]] = entry.split(',')
 #     print(id_to_cvelist)
 
 #     print(f'Existing key = {id_to_cvelist["id2"]}, non-existing key = {id_to_cvelist["id3"]}')
 
 #     # dict comprehension
-#     new_dict = {id: cve_entry.split(',') for id, cve_entry in zip(ids, cve_list)}
+#     new_dict = {id: cve_entry.split(',') for id, cve_entry in zip(ids, cve_ids)}
 #     print(new_dict)
 
 
