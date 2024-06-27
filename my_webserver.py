@@ -102,6 +102,14 @@ def my_scrapper():
     else:
         app.logger.error(f'The "Mitigation Tool:Tracking ID" column does not exist in the Excel file {last_file}.')
 
+    # Create a zip from the lists, starting with an index number
+    table_rows = [(index, product, release, cve_id, disposition_rationale, internal_comments, tracking_ids) 
+            for index, (product, release, cve_id, disposition_rationale, internal_comments, tracking_ids) 
+            in enumerate(zip(products, releases, cve_ids, disposition_rationales, internal_comments_list, tracking_ids_list))]
+    
+    app.logger.info(f'The table values in zip (tuples) format: {table_rows}')
+
+
     # Create an xlsx output filename with a timestamp prefix
 #    output_xls_filename = create_output_filename(last_file)
 
